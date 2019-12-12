@@ -1,7 +1,7 @@
 <?php
 /*
 Plugin Name: BigCommerce Product Feature
-Description: Creates a widget which allows the site owner to render a product, optionally with image, description, price, buy button, and read more button.
+Description: Creates a widget which allows the site owner to render a product, optionally with image, title, description, and read more button.
 Author: Topher
 Author URI: http://topher1kenobe.com
 Version: 1.1
@@ -10,7 +10,7 @@ License: GPL
 */
 
 /**
- * Provides a WordPress widget that renders recent essay from HeroPress.com
+ * Provides a WordPress widget that renders a specified BigCommerce product
  *
  * @package BC_Product_Feature
  * @since   BC_Product_Feature 1.0
@@ -29,25 +29,7 @@ License: GPL
 class BC_Product_Feature extends WP_Widget {
 
 	/**
-	* Holds the source URL for the data
-	*
-	* @access private
-	* @since  1.0
-	* @var    string
-	*/
-	private $bcpf_data_url = null;
-
-	/**
-	* Sets the number of items to be pulled from the remote end point
-	*
-	* @access public
-	* @since  1.0
-	* @var    object
-	*/
-	private $bcpf_data_limit = null;
-
-	/**
-	* Holds the data retrieved from the remote server
+	* Holds the data retrieved from the database
 	*
 	* @access private
 	* @since  1.0
@@ -56,7 +38,7 @@ class BC_Product_Feature extends WP_Widget {
 	private $bcpf_data = null;
 
 	/**
-	* BC_Product_Feature Constructor, sets up Widget, gets data
+	* BC_Product_Feature Constructor, sets up Widget
 	*
 	* @access public
 	* @since  1.0
@@ -67,43 +49,38 @@ class BC_Product_Feature extends WP_Widget {
 		//  Build out the widget details
 		parent::__construct(
 			'bc-product-feature-widget',
-			__( 'HeroPress Most Recent Essay', 'bc-product-feature-widget' ),
-			array( 'description' => __( 'Renders recent essays from HeroPress.com.', 'bc-product-feature-widget' ), )
+			__( 'BigCommerce Product Feature', 'bc-product-feature-widget' ),
+			array( 'description' => __( 'Renders a specified BigCommerce product.', 'bc-product-feature-widget' ), )
 		);
 
-		// assign the data source URL
-		$this->bcpf_data_url = 'http://bcpf.com/essays/feed/';
-
-		$this->bcpf_data_limit = 5;
+        $this->data_fetcher();
 
 	}
 
 	/**
 	* Data fetcher
 	*
-	* Runs at instantiation, gets data from remote server.  Caching built in.
+	* Runs at instantiation, gets array of products
 	*
 	* @access private
 	* @since  1.0
 	* @return void
 	*/
-	private function data_fetcher( $instance ) {
+	private function data_fetcher() {
 
-		$rss = fetch_feed( $this->bcpf_data_url );
+        $args = array (
+            'post_type'      => 'bigcommerce_product',
+            'post_status'    => 'publish',
+            'posts_per_page' => -1,
+            'orderby'        => 'title',
+            'order'          => 'ASC',
+        );
 
-		// Checks that the object is created correctly
-		if ( ! is_wp_error( $rss ) ) {
-
-			// Figure out how many total items there are, but limit it to 5.
-			$maxitems = $rss->get_item_quantity( absint( $this->bcpf_data_limit ) );
-
-			// Build an array of all the items, starting with element 0 (first element).
-			$rss_items = $rss->get_items( 0, $maxitems );
-
-		}
+        // The Query
+        $products = get_posts( $args );
 
 		// store the data in an attribute
-		$this->bcpf_data = $rss_items;
+		$this->bcpf_data = $products;
 
 	}
 
@@ -118,63 +95,31 @@ class BC_Product_Feature extends WP_Widget {
 	*/
 	private function data_render( $instance = '' ) {
 
-		// go get the data and store it in $this->bcpf_data
-		$this->data_fetcher( $instance );
-
 		// instantiate $output
 		$output = '';
 
-		// see if we have data
-		if ( 0 < count( $this->bcpf_data ) ) {
+        // make sure we have a post_id, then get data
+        if ( ! empty( $instance['bcpf-product-id'] ) ) {
 
-			// start an unordered list
-			$output .= '<ul>' . "\n";
+            $output     = '';
+            $post_id    = $instance['bcpf-product-id'];
+            $product_id = get_post_meta( $post_id, 'bigcommerce_id', true );
+            
+            // make sure we really want things
+            if ( ! empty( $instance['bcpf-show-image'] ) ) {
+                $output .= do_shortcode( '[bc-component id="' . $product_id . '" type="image"]' );
+            }
+            if ( ! empty( $instance['bcpf-show-title'] ) ) {
+                $output .= do_shortcode( '[bc-component id="' . $product_id . '" type="title"]' );
+            }
+            if ( ! empty( $instance['bcpf-show-description'] ) ) {
+                $output .= do_shortcode( '[bc-component id="' . $product_id . '" type="description"]' );
+            }
+            if ( ! empty( $instance['bcpf-show-readmore'] ) ) {
+                $output .= '<a class="bc-btn bc-btn--view-product" href="' . get_permalink( $post_id ) . '">' . __( 'Read More', 'bc-product-feature-widget' ) . '</a>' . "\n";
+            }
 
-			// Loop through each feed item and display each item as a hyperlink.
-			foreach ( $this->bcpf_data as $item ) {
-
-				$author = $item->get_authors();
-
-				$output .= '<li>' . "\n";
-
-				$enclosure = $item->get_enclosure();
-
-				if ( $enclosure != '' && $instance['bcpf-show-image'] == 1 ) {
-					// start the link
-					$output .= '<a class="bcpf_essay_title" href="' . esc_url( $item->get_permalink() ) . '">';
-
-					$output .= '<img src="' . esc_url( $enclosure->get_link() ) . '">' . "\n";
-
-					// end the link
-					$output .= '</a>' . "\n";
-				}
-
-				if ( $instance['bcpf-show-title'] == 1 ) {
-					// start the link
-					$output .= '<a class="bcpf_essay_title" href="' . esc_url( $item->get_permalink() ) . '">';
-
-					// print the news headline
-					$output .= esc_html( $item->get_title() ) . "\n";
-
-					// end the link
-					$output .= '</a>' . "\n";
-				}
-
-				if ( $instance['bcpf-show-description'] == 1 ) {
-					$output .= '<div class="bcpf_contributor">' . $author[0]->name . '</div>';
-				}
-
-				if ( $instance['bcpf-show-price'] == 1 ) {
-					$output .= '<div class="bcpf_essay_pubdate"><span class="bcpf_essay_pubdate_prefix">' . __( 'Posted', 'bc-product-feature-widget' ) . '</span> ' . $item->get_date( 'j F Y' ) . '</div>' . "\n";
-				}
-
-				$output .= '</li>' . "\n";
-
-			}
-
-			$output .= '</ul>' . "\n\n";
-
-		}
+        }
 
 		return $output;
 	}
@@ -200,6 +145,13 @@ class BC_Product_Feature extends WP_Widget {
 
 		// echo the widget title
 		echo wp_kses_post( $args['before_widget'] );
+            echo '<script>' . "\n";
+            echo 'jQuery(document).ready(function( $ ) {' . "\n";
+
+                echo "$('.bc-quickview-trigger[data-productid='25605']').click()" . "\n";
+
+            echo '});' . "\n";
+            echo '</script>' . "\n";
 		if ( ! empty( $title ) ) {
 			echo wp_kses_post( $args['before_title'] ) . esc_html( $title ) . wp_kses_post( $args['after_title'] );
 		}
@@ -229,29 +181,33 @@ class BC_Product_Feature extends WP_Widget {
 
 		// make the form for the title field in the admin
 		?>
-		<p>
-			<label for="<?php echo esc_attr( $this->get_field_id( 'title' ) ); ?>"><?php _e( 'Title:', 'bc-product-feature-widget' ); ?></label>
+        <p>
+            Choose a product and select the attributes you'd like to show in the widget.
+        </p>
+
+		<h4>
+			<label for="<?php echo esc_attr( $this->get_field_id( 'title' ) ); ?>"><?php _e( 'Widget Title:', 'bc-product-feature-widget' ); ?></label>
 			<input class="widefat" id="<?php echo esc_attr( $this->get_field_id( 'title' ) ); ?>" name="<?php echo esc_attr( $this->get_field_name( 'title' ) ); ?>" type="text" value="<?php echo esc_attr( $title ); ?>">
-		</p>
+		</h4>
 
-		<?php
-			// set up some defaults
-			if ( $instance['bcpf-show-image'] == '' ) {
-				$instance['bcpf-show-image'] = 1;
-			}
+		<h4>
 
-			if ( $instance['bcpf-show-title'] == '' ) {
-				$instance['bcpf-show-title'] = 1;
-			}
-
-			if ( $instance['bcpf-show-description'] == '' ) {
-				$instance['bcpf-show-description'] = 1;
-			}
-
-			if ( $instance['bcpf-show-price'] == '' ) {
-				$instance['bcpf-show-price'] = 1;
-			}
-		?>
+            <?php
+            // make sure we have results
+            if ( count( $this->bcpf_data ) > 0 ) {
+                echo '<select name="' . esc_attr( $this->get_field_name( 'bcpf-product-id' ) ) . '" style="max-width: 300px;">' . "\n";
+                echo '<option value="">' . __( 'Choose a Product', 'wp-featured-products' ) . '</option>' . "\n";
+                foreach ( $this->bcpf_data as $key => $product ) {
+                    echo '<option value="' . absint( $product->ID ) . '"' . selected( $instance['bcpf-product-id'], $product->ID, false ) . '>' . esc_html( $product->post_title ) . '</option>' . "\n";
+                }
+                echo '</select>' . "\n";
+            } else {
+                echo '<p>';
+                esc_html_e( 'No products found, ', 'wp-featured-products' );
+                echo '</p>';
+            }
+            ?>
+		</h4>
 
 		<h4><?php _e( 'Show', 'bc-product-feature-widget' ); ?>:</h4>
 		<ul>
@@ -261,15 +217,15 @@ class BC_Product_Feature extends WP_Widget {
 			</li>
 			<li>
 				<input id="<?php echo $this->get_field_id( 'bcpf-show-title' ); ?>" name="<?php echo $this->get_field_name( 'bcpf-show-title' ); ?>" type="checkbox" value="1" <?php checked( '1', $instance['bcpf-show-title'], true ); ?>>
-				<label for="<?php echo $this->get_field_id( 'bcpf-show-title' ); ?>"> <?php _e( 'Title', 'bc-product-feature-widget' ); ?></label>
+				<label for="<?php echo $this->get_field_id( 'bcpf-show-title' ); ?>"> <?php _e( 'Product Title', 'bc-product-feature-widget' ); ?></label>
 			</li>
 			<li>
 				<input id="<?php echo $this->get_field_id( 'bcpf-show-description' ); ?>" name="<?php echo $this->get_field_name( 'bcpf-show-description' ); ?>" type="checkbox" value="1" <?php checked( '1', $instance['bcpf-show-description'], true ); ?>>
-				<label for="<?php echo $this->get_field_id( 'bcpf-show-description' ); ?>"> <?php _e( 'Author', 'bc-product-feature-widget' ); ?></label>
+				<label for="<?php echo $this->get_field_id( 'bcpf-show-description' ); ?>"> <?php _e( 'Description', 'bc-product-feature-widget' ); ?></label>
 			</li>
 			<li>
-				<input id="<?php echo $this->get_field_id( 'bcpf-show-price' ); ?>" name="<?php echo $this->get_field_name( 'bcpf-show-price' ); ?>" type="checkbox" value="1" <?php checked( '1', $instance['bcpf-show-price'], true ); ?>>
-				<label for="<?php echo $this->get_field_id( 'bcpf-show-price' ); ?>"> <?php _e( 'Publish Date', 'bc-product-feature-widget' ); ?></label>
+				<input id="<?php echo $this->get_field_id( 'bcpf-show-readmore' ); ?>" name="<?php echo $this->get_field_name( 'bcpf-show-readmore' ); ?>" type="checkbox" value="1" <?php checked( '1', $instance['bcpf-show-readmore'], true ); ?>>
+				<label for="<?php echo $this->get_field_id( 'bcpf-show-readmore' ); ?>"> <?php _e( 'Price', 'bc-product-feature-widget' ); ?></label>
 			</li>
 
 		</ul>
@@ -294,10 +250,11 @@ class BC_Product_Feature extends WP_Widget {
 
 		// set instance to hold new instance data
 		$instance['title']                  = ( ! empty( $new_instance['title'] ) ) ? strip_tags( $new_instance['title'] ) : '';
+		$instance['bcpf-product-id']        = absint( $new_instance['bcpf-product-id'] );
 		$instance['bcpf-show-image']        = absint( $new_instance['bcpf-show-image'] );
 		$instance['bcpf-show-title']        = absint( $new_instance['bcpf-show-title'] );
 		$instance['bcpf-show-description']  = absint( $new_instance['bcpf-show-description'] );
-		$instance['bcpf-show-price']        = absint( $new_instance['bcpf-show-price'] );
+		$instance['bcpf-show-readmore']        = absint( $new_instance['bcpf-show-readmore'] );
 
 		return $instance;
 	}
