@@ -60,7 +60,7 @@ class BC_Product_Feature extends WP_Widget {
 	/**
 	* Data fetcher
 	*
-	* Runs at instantiation, gets array of products
+	* Runs at instantiation, gets array of products using WP_Query
 	*
 	* @access private
 	* @since  1.0
@@ -105,7 +105,7 @@ class BC_Product_Feature extends WP_Widget {
             $post_id    = $instance['bcpf-product-id'];
             $product_id = get_post_meta( $post_id, 'bigcommerce_id', true );
             
-            // make sure we really want things
+            // make sure we really want things and then print them
             if ( ! empty( $instance['bcpf-show-image'] ) ) {
                 $output .= do_shortcode( '[bc-component id="' . $product_id . '" type="image"]' );
             }
@@ -137,12 +137,16 @@ class BC_Product_Feature extends WP_Widget {
 		// instantiate $output
 		$output = '';
 
+		// echo the before_widget html
+		echo wp_kses_post( $args['before_widget'] );
+
 		// filter the title
 		$title	= apply_filters( 'widget_title', $instance['title'] );
 
-		// go get the news
+		// go get the primary data
 		$output .= $this->data_render( $instance );
 
+        // optionally print the widget title
 		if ( ! empty( $title ) ) {
 			echo wp_kses_post( $args['before_title'] ) . esc_html( $title ) . wp_kses_post( $args['after_title'] );
 		}
@@ -155,7 +159,7 @@ class BC_Product_Feature extends WP_Widget {
 	}
 
 	/**
-	 * Back-end widget form.
+	 * Back-end widget form. Asks for: widget title via textfield, product via dropdown, checkbox choice to render product image, product title, products description, and Read More button
 	 *
 	 * @see   WP_Widget::form()
 	 *
@@ -216,7 +220,7 @@ class BC_Product_Feature extends WP_Widget {
 			</li>
 			<li>
 				<input id="<?php echo $this->get_field_id( 'bcpf-show-readmore' ); ?>" name="<?php echo $this->get_field_name( 'bcpf-show-readmore' ); ?>" type="checkbox" value="1" <?php checked( '1', $instance['bcpf-show-readmore'], true ); ?>>
-				<label for="<?php echo $this->get_field_id( 'bcpf-show-readmore' ); ?>"> <?php _e( 'Price', 'bc-product-feature-widget' ); ?></label>
+				<label for="<?php echo $this->get_field_id( 'bcpf-show-readmore' ); ?>"> <?php _e( 'Read More button', 'bc-product-feature-widget' ); ?></label>
 			</li>
 
 		</ul>
