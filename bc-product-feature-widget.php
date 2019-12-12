@@ -143,15 +143,6 @@ class BC_Product_Feature extends WP_Widget {
 		// go get the news
 		$output .= $this->data_render( $instance );
 
-		// echo the widget title
-		echo wp_kses_post( $args['before_widget'] );
-            echo '<script>' . "\n";
-            echo 'jQuery(document).ready(function( $ ) {' . "\n";
-
-                echo "$('.bc-quickview-trigger[data-productid='25605']').click()" . "\n";
-
-            echo '});' . "\n";
-            echo '</script>' . "\n";
 		if ( ! empty( $title ) ) {
 			echo wp_kses_post( $args['before_title'] ) . esc_html( $title ) . wp_kses_post( $args['after_title'] );
 		}
@@ -254,7 +245,7 @@ class BC_Product_Feature extends WP_Widget {
 		$instance['bcpf-show-image']        = absint( $new_instance['bcpf-show-image'] );
 		$instance['bcpf-show-title']        = absint( $new_instance['bcpf-show-title'] );
 		$instance['bcpf-show-description']  = absint( $new_instance['bcpf-show-description'] );
-		$instance['bcpf-show-readmore']        = absint( $new_instance['bcpf-show-readmore'] );
+		$instance['bcpf-show-readmore']     = absint( $new_instance['bcpf-show-readmore'] );
 
 		return $instance;
 	}
